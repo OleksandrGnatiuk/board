@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "doroge-deshevo"
+version = "0.1.0"
+description = "board of adverticement"
+authors = ["OleksandrGnatiuk <oleksandr.gnatiuk@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+packages = [{include = "doroge_deshevo"}]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+aiogram = "^3.3.0"
+python-env = "^1.0.0"
+python-dotenv = "^1.0.1"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
