@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 
 from aiogram import F, Bot, types, Router
 from aiogram.filters import Command, CommandStart
+from aiogram.enums import ParseMode
 from aiogram.utils.formatting import as_list, as_marked_section, Bold
 from sqlalchemy import and_
 
@@ -74,14 +75,14 @@ async def rules_cmd(message: types.Message):
     await message.answer(text.as_html())
 
 
-@user_group_router.message(F.text.lower() == "питання реклами")
+@user_group_router.message(F.text.lower() == "питання з реклами")
 @user_group_router.message(Command("ad"))
 async def ad_cmd(message: types.Message):
     text = as_list(
         as_marked_section(
             Bold("Підвищення ліміту розміщення оголошень в день:"),
-            "До 10 оголошень (включно) - 50 грн.;",
-            "Безлім - 100 грн.;",
+            "До 10 оголошень (включно) - 20 грн.;",
+            "До 50 оголошень (включно) - 50 грн.;",
             marker="✅ ",
         ),
         as_marked_section(
@@ -124,21 +125,30 @@ async def ad_cmd(message: types.Message):
     await message.answer(text.as_html())
 
 
+@user_group_router.message(F.text.lower() == "міста")
+@user_group_router.message(Command("cities"))
+async def cities_cmd(message: types.Message):
+    text = """
+    Славута-@slavuta_dd | Нетішин-@netishyn_dd |
+Шепетівка-@shepetivka_dd | """
+    await message.answer(text)
+
+
+
 
 @user_group_router.message(CommandStart())
 async def start_cmd(message: types.Message, bot: Bot):
 
     await bot.send_message(
         chat_id=message.chat.id, 
-        text=f'''Вітаємо Вас, {message.from_user.first_name}!
-    Ви вступили до групи, в якій можна купити чи продати все, що Вам необхідно.
-    Ознайомтеся із правилами групи.
-    Дякую за розуміння!''',
+        text=f'Вітаємо Вас, {message.from_user.first_name}!\nВи вступили до групи, в якій можна купити чи продати все, що Вам необхідно. Ознайомтеся із <b>правилами групи</b>.\nДякую за розуміння!',
+        parse_mode=ParseMode.HTML,
         reply_markup=get_keyboard(
             "Правила групи",
-            "Питання реклами",
+            "Міста",
+            "Питання з реклами",
             placeholder="Розмістіть оголошення або оберіть розділ:",
-            sizes=(2,)
+            sizes=(3,)
         ),
     )
 
@@ -170,24 +180,34 @@ async def cleaner(message: types.Message):
             user = User(user_id=message.from_user.id, full_name=message.from_user.full_name,)
             session.add(user)
             session.commit()
+        
+        posts = session.query(Post).filter(
+                Post.user_id==message.from_user.id, 
+                (datetime.now() - timedelta(days=1)) < Post.created_at,
+                Post.created_at < datetime.now()
+                ).all()
+        if len(posts) >= 3 and int(user.num_paid_post) == 0:
+            await message.delete()
+            text = f"{message.from_user.first_name}, Ви перевищили ліміт повідомлень за останні 24 години!"
+            await message.answer(text=text)
         else:
-            posts = session.query(Post).filter(
-                    Post.user_id==message.from_user.id, 
-                    (datetime.now() - timedelta(days=1)) < Post.created_at,
-                    Post.created_at < datetime.now()
-                    ).all()
-            if len(posts) >= 3:
-                await message.delete()
-                text = f"{message.from_user.first_name}, Ви перевищили ліміт повідомлень за останні 24 години!"
-                await message.answer(text=text)
-            else:
+            post = session.query(Post).filter_by(post_id=message.message_id).first()
+            if not post:
                 post = Post(
                     post_id=message.message_id,
                     user_id=message.from_user.id,
-                    text=text,
+                    text=message.text,
+                    caption=message.caption,
                     city=message.chat.username.split("_")[0]
                 )
                 session.add(post)
+                session.commit()
+                if int(user.num_paid_post) > 0:
+                    user.num_paid_post = int(user.num_paid_post) - 1
+                session.commit()
+            else:
+                post.text=message.text
+                post.caption=message.caption
                 session.commit()
 
     
