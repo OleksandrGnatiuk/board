@@ -5,20 +5,18 @@ from aiogram import F, Bot, types, Router
 from aiogram.filters import Command, CommandStart
 from aiogram.enums import ParseMode
 from aiogram.utils.formatting import as_list, as_marked_section, Bold
-from sqlalchemy import and_
-
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession, session
 
 from kbds.reply import get_keyboard
 from common.restricted_words import restricted_words
 # from filters.chat_types import ChatTypeFilter
-from database.db import User, Post, session
-
+from database.models import User, Post
 
 
 user_group_router = Router()
 # user_group_router.message.filter(ChatTypeFilter(["group", "supergroup"]))
 # user_group_router.edited_message.filter(ChatTypeFilter(["group", "supergroup"]))
-
 
 
 @user_group_router.message(Command("admin"))
@@ -37,7 +35,6 @@ async def get_admins(message: types.Message, bot: Bot):
     if message.from_user.id in admins_list:
         await message.delete()
     #print(admins_list)
-
 
 
 @user_group_router.message(F.text.lower() == "правила групи")
@@ -134,8 +131,6 @@ async def cities_cmd(message: types.Message):
     await message.answer(text)
 
 
-
-
 @user_group_router.message(CommandStart())
 async def start_cmd(message: types.Message, bot: Bot):
 
@@ -160,7 +155,7 @@ def clean_text(text: str):
 
 @user_group_router.edited_message()
 @user_group_router.message()
-async def cleaner(message: types.Message):
+async def cleaner(message: types.Message, session: AsyncSession):
     text = ''
     if message.text:
         text = message.text
@@ -176,23 +171,28 @@ async def cleaner(message: types.Message):
         await message.delete()
         # await message.chat.ban(message.from_user.id)
     else:
-        user = session.query(User).filter_by(user_id=message.from_user.id).first()
+        result = await session.execute(select(User).filter_by(user_id=message.from_user.id))
+        user = result.scalar()
         if not user:
             user = User(user_id=message.from_user.id, full_name=message.from_user.full_name,)
             session.add(user)
-            session.commit()
+            await session.commit()
+            await session.refresh(user)
         
-        posts = session.query(Post).filter(
-                Post.user_id==message.from_user.id, 
+        result = await session.execute(select(Post).filter(
+                Post.user_id == message.from_user.id,
                 (datetime.now() - timedelta(days=1)) < Post.created_at,
                 Post.created_at < datetime.now()
-                ).all()
+                ))
+        posts = result.scalars().all()
+
         if len(posts) >= 3 and int(user.num_paid_post) == 0:
             await message.delete()
             text = f"{message.from_user.first_name}, Ви перевищили ліміт повідомлень за останні 24 години!"
             await message.answer(text=text)
         else:
-            post = session.query(Post).filter_by(post_id=message.message_id).first()
+            result = await session.execute(select(Post).filter_by(post_id=message.message_id))
+            post = result.scalar()
             if not post:
                 post = Post(
                     post_id=message.message_id,
@@ -202,14 +202,17 @@ async def cleaner(message: types.Message):
                     city=message.chat.username.split("_")[0]
                 )
                 session.add(post)
-                session.commit()
+                await session.commit()
+                await session.refresh(post)
                 if int(user.num_paid_post) > 0:
                     user.num_paid_post = int(user.num_paid_post) - 1
-                session.commit()
+                await session.commit()
+                await session.refresh(user)
             else:
-                post.text=message.text
-                post.caption=message.caption
-                session.commit()
+                post.text = message.text
+                post.caption = message.caption
+                await session.commit()
+                await session.refresh(post)
 
     
 
