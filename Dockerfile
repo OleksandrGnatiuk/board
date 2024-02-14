@@ -19,4 +19,4 @@ EXPOSE 8000
 
 
 # Запустимо нашу програму всередині контейнера
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--forwarded-allow-ips='*'", "--proxy-headers"]
+CMD ["python", "app.py"]
