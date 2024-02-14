@@ -12,6 +12,10 @@ from kbds.reply import get_keyboard
 from common.restricted_words import restricted_words
 # from filters.chat_types import ChatTypeFilter
 from database.models import User, Post
+from database.orm_query import (create_post, create_user, 
+                                calc_daily_posts, 
+                                get_user, get_post_by_message_id,
+                                reduce_num_paid_post, change_post)
 
 
 user_group_router = Router()
@@ -110,16 +114,12 @@ async def ad_cmd(message: types.Message):
             'на дошках усіх міст платформи "Місцеві оголошення" - 500 грн./оголошення',
             marker="✅ ",
         ),
-        as_marked_section(
-            Bold("Автоматичний репост оголошення в одній групі:"),
-            "Публікація 7 днів - 70 грн.;",
-            "Публікація 30 днів - 280 грн.;",
-            marker="✅ ",
-        ),
         sep="\n----------------------\n",
     )
     await message.answer(text="По питаннях реклами звертатися до @trueaaabot")
     await message.answer(text.as_html())
+    await message.answer(text="По питаннях реклами звертатися до @trueaaabot")
+
 
 
 @user_group_router.message(F.text.lower() == "міста")
@@ -161,8 +161,6 @@ async def cleaner(message: types.Message, session: AsyncSession):
         text = message.text
     elif message.caption:
         text = message.caption
-    else:
-        text = "медіа"
 
     if restricted_words.intersection(clean_text(text.lower()).split()):
         await message.answer(
@@ -171,48 +169,21 @@ async def cleaner(message: types.Message, session: AsyncSession):
         await message.delete()
         # await message.chat.ban(message.from_user.id)
     else:
-        result = await session.execute(select(User).filter_by(user_id=message.from_user.id))
-        user = result.scalar()
+        user = await get_user(message, session)
         if not user:
-            user = User(user_id=message.from_user.id, full_name=message.from_user.full_name,)
-            session.add(user)
-            await session.commit()
-            await session.refresh(user)
+            await create_user(message, session)
         
-        result = await session.execute(select(Post).filter(
-                Post.user_id == message.from_user.id,
-                (datetime.now() - timedelta(days=1)) < Post.created_at,
-                Post.created_at < datetime.now()
-                ))
-        posts = result.scalars().all()
+        posts = await calc_daily_posts(message, session)
 
         if len(posts) >= 3 and int(user.num_paid_post) == 0:
-            await message.delete()
-            text = f"{message.from_user.first_name}, Ви перевищили ліміт повідомлень за останні 24 години!"
-            await message.answer(text=text)
-        else:
-            result = await session.execute(select(Post).filter_by(post_id=message.message_id))
-            post = result.scalar()
-            if not post:
-                post = Post(
-                    post_id=message.message_id,
-                    user_id=message.from_user.id,
-                    text=message.text,
-                    caption=message.caption,
-                    city=message.chat.username.split("_")[0]
-                )
-                session.add(post)
-                await session.commit()
-                await session.refresh(post)
-                if int(user.num_paid_post) > 0:
-                    user.num_paid_post = int(user.num_paid_post) - 1
-                await session.commit()
-                await session.refresh(user)
+            post = await get_post_by_message_id(message, session)
+            if post:
+                await change_post(message, session)
             else:
-                post.text = message.text
-                post.caption = message.caption
-                await session.commit()
-                await session.refresh(post)
-
-    
-
+                await message.delete()
+                text = f"{message.from_user.first_name}, Ви перевищили ліміт повідомлень за останні 24 години!"
+                await message.answer(text=text)
+        else:
+            await create_post(message, session)
+            await reduce_num_paid_post(message, session)
+            
