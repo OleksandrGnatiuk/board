@@ -7,6 +7,6 @@ from filters.chat_types import ChatTypeFilter, IsAdmin
 from kbds.reply import get_keyboard
 
 
-admin_privat_router = Router()
+admin_private_router = Router()
 # admin_router.message.filter(ChatTypeFilter(["private"]), IsAdmin())
 

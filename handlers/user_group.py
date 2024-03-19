@@ -121,8 +121,7 @@ async def ad_cmd(message: types.Message):
     await message.answer(text="По питаннях реклами звертатися до @trueaaabot")
 
 
-
-@user_group_router.message(F.text.lower() == "міста")
+@user_group_router.message(F.text.lower() == "інші міста")
 @user_group_router.message(Command("cities"))
 async def cities_cmd(message: types.Message):
     text = """
@@ -133,15 +132,13 @@ async def cities_cmd(message: types.Message):
 
 @user_group_router.message(CommandStart())
 async def start_cmd(message: types.Message, bot: Bot):
-
     await bot.send_message(
-        chat_id=message.chat.id, 
-        # text=f'Вітаємо Вас, {message.from_user.first_name}!\nВи вступили до групи, в якій можна купити чи продати все, що Вам необхідно. Ознайомтеся із <b>правилами групи</b>.\nДякую за розуміння!',
-        text = '...',
+        chat_id=message.chat.id,
+        text='...',
         parse_mode=ParseMode.HTML,
         reply_markup=get_keyboard(
             "Правила групи",
-            "Міста",
+            "Інші міста",
             "Питання з реклами",
             placeholder="Розмістіть оголошення або оберіть розділ:",
             sizes=(3,)

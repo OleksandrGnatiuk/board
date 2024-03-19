@@ -36,6 +36,10 @@ def get_keyboard(
             keyboard.add(KeyboardButton(text=text))
 
     return keyboard.adjust(*sizes).as_markup(
-            resize_keyboard=True, input_field_placeholder=placeholder)
+        resize_keyboard=True,
+        input_field_placeholder=placeholder,
+        # selective=True,
+        # one_time_keyboard=True,
+    )
 
 

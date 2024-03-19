@@ -6,5 +6,5 @@ private = [
     BotCommand(command='rules', description='Правила чату'),
     BotCommand(command='ad', description='Питання з реклами'),
     # BotCommand(command='clear', description='Видалити службові повідомлення'),
-    BotCommand(command='cities', description='Перелік міст'),
+    BotCommand(command='cities', description='Інші міста'),
 ]
